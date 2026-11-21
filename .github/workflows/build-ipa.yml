@@ -1,0 +1,47 @@
+name: 自动编译未签名 IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 编译（关闭签名，产出未签名 .app）
+        run: |
+          xcodebuild \
+            -project WatermarkCamera.xcodeproj \
+            -scheme WatermarkCamera \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: 打包为 IPA
+        run: |
+          APP="$(find ./DerivedData/Build/Products -name 'WatermarkCamera.app' -type d | head -1)"
+          if [ -z "$APP" ]; then
+            echo "错误：未找到编译产物 WatermarkCamera.app"
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry WatermarkCamera-unsigned.ipa Payload
+          ls -lh WatermarkCamera-unsigned.ipa
+
+      - name: 提供下载
+        uses: actions/upload-artifact@v4
+        with:
+          name: WatermarkCamera-IPA-未签名
+          path: WatermarkCamera-unsigned.ipa
+          retention-days: 30
