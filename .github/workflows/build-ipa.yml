@@ -12,6 +12,33 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: 整理目录结构（兼容网页上传的嵌套）
+        run: |
+          echo "===== 整理前的结构 ====="
+          find . -maxdepth 4 -type f $ -name '*.swift' -o -name 'project.pbxproj' -o -name 'index.html' -o -name 'xlsx.full.min.js' $ | sort
+
+          PROJ=$(find . -name project.pbxproj | sort | tail -1)
+          if [ -z "$PROJ" ]; then
+            echo "错误：仓库里找不到 project.pbxproj"; exit 1
+          fi
+          PROJ_DIR=$(dirname "$PROJ")
+          ROOT_DIR=$(dirname "$PROJ_DIR")
+          SRC="$ROOT_DIR/WatermarkCamera"
+          if [ ! -d "$SRC" ]; then
+            echo "错误：工程同级找不到 WatermarkCamera 源码目录: $SRC"; exit 1
+          fi
+          echo "选定工程根目录: $ROOT_DIR"
+
+          if [ "$ROOT_DIR" != "." ]; then
+            echo "检测到嵌套，正在拍平到仓库根目录 ..."
+            cp -R "$ROOT_DIR"/. ./
+            echo "拍平完成"
+          fi
+
+          echo "===== 确认关键文件 ====="
+          test -f WatermarkCamera/RouteView.swift && echo "RouteView.swift OK" || echo "警告: RouteView.swift 缺失"
+          test -d WatermarkCamera/RouteWeb && echo "RouteWeb OK" || echo "警告: RouteWeb 缺失"
+
       - name: 编译（关闭签名，产出未签名 .app）
         run: |
           xcodebuild \
