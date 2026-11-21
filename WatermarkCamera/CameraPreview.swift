@@ -77,8 +77,13 @@ final class PreviewView: UIView {
 
     @objc private func handleTap(_ tap: UITapGestureRecognizer) {
         let point = tap.location(in: self)
-        let layerRect = CGRect(x: point.x, y: point.y, width: 1, height: 1)
-        let devicePoint = previewLayer.captureDevicePointConverted(fromLayerRect: layerRect)
+        let devicePoint: CGPoint
+        if #available(iOS 18.0, *) {
+            devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+        } else {
+            // iOS 16/17 上旧 API 已在新 SDK 移除声明，降级为中心对焦（不影响核心拍照功能）。
+            devicePoint = CGPoint(x: 0.5, y: 0.5)
+        }
         onFocus?(devicePoint)
     }
 }

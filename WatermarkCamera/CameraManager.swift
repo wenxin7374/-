@@ -43,13 +43,13 @@ final class CameraManager: ObservableObject {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleInterruption(_:)),
-            name: AVCaptureSession.interruptionNotification,
+            name: AVCaptureSessionInterruptionNotification,
             object: session
         )
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleTorchAvailabilityChange(_:)),
-            name: AVCaptureDevice.torchAvailabilityDidChangeNotification,
+            name: AVCaptureDeviceTorchAvailabilityDidChangeNotification,
             object: nil
         )
     }
