@@ -1,7 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// 唯一主界面：实时取景 + 右上手电筒 + 左下水印 + 底部快门。
+/// 主界面：相机 + 路单排序两个视图，可互相切换并联动。
+/// 路单里复制的水印文案会自动带入相机备注，形成送货拍照闭环。
 struct CameraView: View {
     @StateObject private var camera = CameraManager()
     @StateObject private var settings = SettingsStore()
@@ -9,6 +10,7 @@ struct CameraView: View {
     @State private var now = Date()
     @State private var toast: String?
     @State private var failedImage: UIImage?
+    @State private var showRoute = false   // false=相机, true=路单
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -17,6 +19,35 @@ struct CameraView: View {
     }
 
     var body: some View {
+        ZStack {
+            if showRoute {
+                // 路单界面
+                RouteView(
+                    onNoteCopied: { text in
+                        settings.note = text
+                        showRoute = false
+                        showToast("已带入相机备注")
+                    },
+                    onBackToCamera: {
+                        showRoute = false
+                    }
+                )
+                .ignoresSafeArea()
+            } else {
+                // 相机界面
+                cameraScreen
+            }
+
+            if let toast {
+                toastView(text: toast)
+            }
+        }
+        .onReceive(timer) { now = $0 }
+    }
+
+    // MARK: - 相机界面
+
+    private var cameraScreen: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -35,10 +66,6 @@ struct CameraView: View {
                 ProgressView()
                     .tint(.white)
             }
-
-            if let toast {
-                toastView(text: toast)
-            }
         }
         .onAppear {
             camera.updateTorchLevel(settings.torchLevel)
@@ -47,7 +74,6 @@ struct CameraView: View {
         .onChange(of: settings.torchLevel) { newValue in
             camera.updateTorchLevel(newValue)
         }
-        .onReceive(timer) { now = $0 }
     }
 
     // MARK: - 控件层
@@ -55,6 +81,7 @@ struct CameraView: View {
     private var controls: some View {
         VStack(spacing: 0) {
             HStack {
+                routeButton
                 Spacer()
                 torchButton
             }
@@ -78,6 +105,22 @@ struct CameraView: View {
             .padding(.top, 14)
             .padding(.bottom, 34)
         }
+    }
+
+    /// 左上角入口：进入路单排序界面
+    private var routeButton: some View {
+        Button { showRoute = true } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "list.number")
+                Text("路单")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Capsule().fill(Color.black.opacity(0.4)))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

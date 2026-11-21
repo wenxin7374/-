@@ -29,7 +29,7 @@ struct WatermarkOverlay: View {
                 .buttonStyle(.plain)
             } else {
                 Button { showingNote = true } label: {
-                    Text("备注：\(settings.note)")
+                    Text(WatermarkRenderer.displayNote(settings.note))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
                         .shadow(color: .black.opacity(0.75), radius: 3, x: 0, y: 1)

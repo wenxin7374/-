@@ -20,6 +20,27 @@ enum WatermarkRenderer {
         timeFormatter.string(from: date)
     }
 
+    /// 去掉备注开头可能已存在的“备注：”前缀，避免合成后出现“备注：备注：”。
+    static func normalizedNote(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefixes = ["备注：", "备注:", "备注 ：", "备注 :"]
+        var changed = true
+        while changed {
+            changed = false
+            for p in prefixes where s.hasPrefix(p) {
+                s = String(s.dropFirst(p.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                changed = true
+            }
+        }
+        return s
+    }
+
+    /// 备注最终展示文本（带统一前缀，或为空）。
+    static func displayNote(_ raw: String) -> String {
+        let clean = normalizedNote(raw)
+        return clean.isEmpty ? "" : "备注：\(clean)"
+    }
+
     /// 将水印按最终照片的实际像素尺寸等比例合成到左下角，保持原始分辨率与长宽比。
     static func render(image: UIImage, snapshot: WatermarkSnapshot) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
@@ -41,7 +62,7 @@ enum WatermarkRenderer {
             let x = w * 0.03
             let bottomInset = h * 0.04
 
-            let noteText = snapshot.note.isEmpty ? "" : "备注：\(snapshot.note)"
+            let noteText = displayNote(snapshot.note)
             let noteStyle = NSMutableParagraphStyle()
             noteStyle.lineBreakMode = .byWordWrapping
             noteStyle.lineSpacing = noteFontSize * 0.15
@@ -56,6 +77,7 @@ enum WatermarkRenderer {
                 .paragraphStyle: noteStyle
             ]
 
+            // 备注高度（可能多行）
             var noteHeight: CGFloat = 0
             if !noteText.isEmpty {
                 let rect = (noteText as NSString).boundingRect(
@@ -67,11 +89,13 @@ enum WatermarkRenderer {
                 noteHeight = ceil(rect.height)
             }
 
-            let timeHeight = timeFontSize * 1.25
-            let gap: CGFloat = noteHeight > 0 ? noteFontSize * 0.45 : 0
-            let blockHeight = timeHeight + gap + noteHeight
-            let topOfBlock = h - bottomInset - blockHeight
-            let gradientTop = max(0, topOfBlock - timeFontSize * 0.6)
+            let timeHeight = timeFontSize * 1.3
+            let gap: CGFloat = noteHeight > 0 ? noteFontSize * 0.5 : 0
+
+            // 从底部往上排布：备注在最下，时间在备注上方，二者互不重叠。
+            let noteTopY = h - bottomInset - noteHeight
+            let timeTopY = noteTopY - gap - timeHeight
+            let gradientTop = max(0, timeTopY - timeFontSize * 0.6)
 
             // 半透明黑色渐变，保证明亮背景下文字可读。
             let colors = [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.55).cgColor]
@@ -91,13 +115,13 @@ enum WatermarkRenderer {
                          blur: max(2, timeFontSize * 0.15),
                          color: UIColor.black.withAlphaComponent(0.75).cgColor)
 
-            let timeRect = CGRect(x: x, y: h - bottomInset - timeHeight,
-                                  width: maxTextWidth, height: timeHeight)
+            // 时间在上
+            let timeRect = CGRect(x: x, y: timeTopY, width: maxTextWidth, height: timeHeight)
             (snapshot.timeText as NSString).draw(in: timeRect, withAttributes: timeAttributes)
 
+            // 备注在下
             if !noteText.isEmpty {
-                let noteRect = CGRect(x: x, y: h - bottomInset - noteHeight,
-                                      width: maxTextWidth, height: noteHeight)
+                let noteRect = CGRect(x: x, y: noteTopY, width: maxTextWidth, height: noteHeight)
                 (noteText as NSString).draw(in: noteRect, withAttributes: noteAttributes)
             }
             cg.restoreGState()
